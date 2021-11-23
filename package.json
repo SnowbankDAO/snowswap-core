@@ -24,9 +24,7 @@
   },
   "dependencies": {
     "fs": "^0.0.1-security",
-    "hardhat-prettier": "^0.0.1"
-  },
-  "devDependencies": {
+    "hardhat-prettier": "^0.0.1",
     "@nomiclabs/hardhat-ethers": "npm:hardhat-deploy-ethers@^0.3.0-beta.11",
     "@nomiclabs/hardhat-etherscan": "^2.1.7",
     "@nomiclabs/hardhat-waffle": "^2.0.1",
@@ -65,7 +63,8 @@
     "compile": "waffle .waffle.json",
     "pretest": "yarn compile",
     "test": "mocha",
-    "prepublishOnly": "yarn test"
+    "prepublishOnly": "yarn test",
+    "postinstall": "waffle .waffle.json"
   },
   "license": "GPL-3.0-or-later"
 }
