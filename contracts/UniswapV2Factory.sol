@@ -3,9 +3,10 @@ pragma solidity =0.5.16;
 import "./interfaces/IUniswapV2Factory.sol";
 import "./UniswapV2Pair.sol";
 
-contract SnowSwapFactory is IUniswapV2Factory {
+contract SnowswapFactory is IUniswapV2Factory {
     address public feeTo;
     address public feeToSetter;
+    bool private areWeAllApes = true;
 
     mapping(address => mapping(address => address)) public getPair;
     address[] public allPairs;

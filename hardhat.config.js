@@ -24,7 +24,15 @@ task('accounts', 'Prints the list of accounts', async (taskArgs, hre) => {
  * @type import('hardhat/config').HardhatUserConfig
  */
 module.exports = {
-  solidity: { compilers: [{ version: '0.5.16' }] },
+  solidity: {
+    version: '0.5.16',
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 230,
+      },
+    },
+  },
   networks: {
     mainnet: {
       url: 'https://api.avax.network/ext/bc/C/rpc',
