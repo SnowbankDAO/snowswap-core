@@ -24,11 +24,15 @@ task('accounts', 'Prints the list of accounts', async (taskArgs, hre) => {
  * @type import('hardhat/config').HardhatUserConfig
  */
 module.exports = {
-  solidity: '0.8.4',
+  solidity: { compilers: [{ version: '0.5.16' }] },
   networks: {
-    ropsten: {
-      url: process.env.ROPSTEN_URL || '',
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    mainnet: {
+      url: 'https://api.avax.network/ext/bc/C/rpc',
+      accounts: [process.env.FEES_SETTER],
+    },
+    localhost: {
+      url: 'http://localhost:8545',
+      accounts: [process.env.FEES_SETTER],
     },
   },
   gasReporter: {
@@ -37,5 +41,8 @@ module.exports = {
   },
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY,
+  },
+  namedAccounts: {
+    feesSetter: { localhost: 0, mainnet: 0 },
   },
 }

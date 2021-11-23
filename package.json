@@ -24,6 +24,7 @@
     "solidity-coverage": "^0.7.17"
   },
   "dependencies": {
+    "fs": "^0.0.1-security",
     "hardhat-prettier": "^0.0.1"
   }
 }
