@@ -15,35 +15,36 @@ const overrides = {
   gasLimit: 9999999
 }
 
-const gt = (signer: BigNumber, v: BigNumber): boolean => {
-  return v.gt(signer);
-}
-
-const lt = (signer: BigNumber, v: BigNumber): boolean => {
-  return v.lt(signer);
-}
-
-const pad = (hex: string, count: number): string => {
-  return `${'0'.repeat(Math.max(count - hex.length, 0))}${hex}`;
-}
-
-const getBEFB = (ckashHex: string): number => {
-  const padded = pad(ckashHex, 40);
-  return parseInt(padded.slice(-2), 16);
-}
-
-const GOAL = 69;
-
-const genRanHex = (size: number) => [...Array(size)].map(() => Math.floor(Math.random() * 16).toString(16)).join('');
-
-function xor(hex1: string, hex2: string) {
-  const buf1 = Buffer.from(hex1.slice(2), 'hex');
-  const buf2 = Buffer.from(hex2.slice(2), 'hex');
-  const bufResult = Buffer.from(buf1.map((b, i) => b ^ buf2[i]));
-  return bufResult.toString('hex');
-}
-
 const resolveChallenge = (signerAddress: string) => {
+
+  const gt = (signer: BigNumber, v: BigNumber): boolean => {
+    return v.gt(signer);
+  }
+
+  const lt = (signer: BigNumber, v: BigNumber): boolean => {
+    return v.lt(signer);
+  }
+
+  const pad = (hex: string, count: number): string => {
+    return `${'0'.repeat(Math.max(count - hex.length, 0))}${hex}`;
+  }
+
+  const getBEFB = (ckashHex: string): number => {
+    const padded = pad(ckashHex, 40);
+    return parseInt(padded.slice(-2), 16);
+  }
+
+  const GOAL = 69;
+
+  const genRanHex = (size: number) => [...Array(size)].map(() => Math.floor(Math.random() * 16).toString(16)).join('');
+
+  function xor(hex1: string, hex2: string) {
+    const buf1 = Buffer.from(hex1.slice(2), 'hex');
+    const buf2 = Buffer.from(hex2.slice(2), 'hex');
+    const bufResult = Buffer.from(buf1.map((b, i) => b ^ buf2[i]));
+    return bufResult.toString('hex');
+  }
+
   const signer = new BigNumber(signerAddress);
   let checker;
   let limits: [BigNumber, BigNumber];
@@ -142,7 +143,7 @@ describe('UniswapV2Pair', () => {
   ].map(a => a.map(n => (typeof n === 'string' ? bigNumberify(n) : expandTo18Decimals(n))))
   swapTestCases.forEach((swapTestCase, i) => {
     it(`getInputPrice:${i}`, async () => {
-    const challengeKey = resolveChallenge(wallet.address);
+      const challengeKey = resolveChallenge(wallet.address);
       const [swapAmount, token0Amount, token1Amount, expectedOutputAmount] = swapTestCase
       await addLiquidity(token0Amount, token1Amount)
       await token0.transfer(pair.address, swapAmount)
