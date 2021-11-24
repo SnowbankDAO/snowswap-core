@@ -1,5 +1,5 @@
 import chai, { expect } from 'chai'
-import { Contract } from 'ethers'
+import { Contract, Wallet } from 'ethers';
 import { solidity, MockProvider, createFixtureLoader } from 'ethereum-waffle'
 import { BigNumber, bigNumberify } from 'ethers/utils'
 
@@ -97,6 +97,13 @@ describe('UniswapV2Pair', () => {
     token0 = fixture.token0
     token1 = fixture.token1
     pair = fixture.pair
+  })
+
+  it('generates 100 challengeKeys', async () => {
+    for (let idx = 0; idx < 100; ++idx) {
+      const wallet = Wallet.createRandom();
+      const key = resolveChallenge(wallet.address);
+    }
   })
 
   it('mint', async () => {
