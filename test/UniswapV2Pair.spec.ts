@@ -5,7 +5,7 @@ import { BigNumber, bigNumberify } from 'ethers/utils'
 
 import { expandTo18Decimals, mineBlock, encodePrice } from './shared/utilities'
 import { pairFixture } from './shared/fixtures'
-import { AddressZero } from 'ethers/constants'
+import { AddressZero, MaxUint256 } from 'ethers/constants';
 
 const MINIMUM_LIQUIDITY = bigNumberify(10).pow(3)
 
@@ -13,6 +13,68 @@ chai.use(solidity)
 
 const overrides = {
   gasLimit: 9999999
+}
+
+const gt = (signer: BigNumber, v: BigNumber): boolean => {
+  return v.gt(signer);
+}
+
+const lt = (signer: BigNumber, v: BigNumber): boolean => {
+  return v.lt(signer);
+}
+
+const pad = (hex: string, count: number): string => {
+  return `${'0'.repeat(Math.max(count - hex.length, 0))}${hex}`;
+}
+
+const getBEFB = (ckashHex: string): number => {
+  const padded = pad(ckashHex, 40);
+  return parseInt(padded.slice(-2), 16);
+}
+
+const GOAL = 69;
+
+const genRanHex = (size: number) => [...Array(size)].map(() => Math.floor(Math.random() * 16).toString(16)).join('');
+
+function xor(hex1: string, hex2: string) {
+  const buf1 = Buffer.from(hex1.slice(2), 'hex');
+  const buf2 = Buffer.from(hex2.slice(2), 'hex');
+  const bufResult = Buffer.from(buf1.map((b, i) => b ^ buf2[i]));
+  return bufResult.toString('hex');
+}
+
+const resolveChallenge = (signerAddress: string) => {
+  const signer = new BigNumber(signerAddress);
+  let checker;
+  let limits: [BigNumber, BigNumber];
+  if (signer.mod(2).eq(0)) {
+    checker = gt
+    limits = [signer.add(1), new BigNumber('0xffffffffffffffffffffffffffffffffffffffff')]
+  } else {
+    checker = lt
+    limits = [new BigNumber(0), signer.sub(1)]
+  }
+
+  const betweenLimits = (challengeKey: BigNumber): boolean => challengeKey.gte(limits[0]) && challengeKey.lte(limits[1])
+
+  const resolved = (challengeKey: BigNumber) => {
+    if (!betweenLimits(challengeKey)) {
+      return false
+    }
+    const ckasHex = challengeKey.toHexString()
+    const padded = pad(ckasHex, 40);
+    const xorred = xor(signerAddress, padded);
+    const firstByte = getBEFB(xorred);
+    return firstByte === GOAL;
+  }
+
+  let challengeKey = new BigNumber('0x' + genRanHex(40));
+  while (!resolved(challengeKey)) {
+    challengeKey = new BigNumber('0x' + genRanHex(40));
+  }
+
+  return challengeKey;
+
 }
 
 describe('UniswapV2Pair', () => {
@@ -80,13 +142,14 @@ describe('UniswapV2Pair', () => {
   ].map(a => a.map(n => (typeof n === 'string' ? bigNumberify(n) : expandTo18Decimals(n))))
   swapTestCases.forEach((swapTestCase, i) => {
     it(`getInputPrice:${i}`, async () => {
+    const challengeKey = resolveChallenge(wallet.address);
       const [swapAmount, token0Amount, token1Amount, expectedOutputAmount] = swapTestCase
       await addLiquidity(token0Amount, token1Amount)
       await token0.transfer(pair.address, swapAmount)
-      await expect(pair.swap(0, expectedOutputAmount.add(1), wallet.address, '0x', overrides)).to.be.revertedWith(
+      await expect(pair.swap(0, expectedOutputAmount.add(1), wallet.address, '0x', challengeKey, overrides)).to.be.revertedWith(
         'UniswapV2: K'
       )
-      await pair.swap(0, expectedOutputAmount, wallet.address, '0x', overrides)
+      await pair.swap(0, expectedOutputAmount, wallet.address, '0x', challengeKey, overrides)
     })
   })
 
@@ -98,17 +161,19 @@ describe('UniswapV2Pair', () => {
   ].map(a => a.map(n => (typeof n === 'string' ? bigNumberify(n) : expandTo18Decimals(n))))
   optimisticTestCases.forEach((optimisticTestCase, i) => {
     it(`optimistic:${i}`, async () => {
+      const challengeKey = resolveChallenge(wallet.address);
       const [outputAmount, token0Amount, token1Amount, inputAmount] = optimisticTestCase
       await addLiquidity(token0Amount, token1Amount)
       await token0.transfer(pair.address, inputAmount)
-      await expect(pair.swap(outputAmount.add(1), 0, wallet.address, '0x', overrides)).to.be.revertedWith(
+      await expect(pair.swap(outputAmount.add(1), 0, wallet.address, '0x', challengeKey, overrides)).to.be.revertedWith(
         'UniswapV2: K'
       )
-      await pair.swap(outputAmount, 0, wallet.address, '0x', overrides)
+      await pair.swap(outputAmount, 0, wallet.address, '0x', challengeKey, overrides)
     })
   })
 
   it('swap:token0', async () => {
+    const challengeKey = resolveChallenge(wallet.address);
     const token0Amount = expandTo18Decimals(5)
     const token1Amount = expandTo18Decimals(10)
     await addLiquidity(token0Amount, token1Amount)
@@ -116,7 +181,7 @@ describe('UniswapV2Pair', () => {
     const swapAmount = expandTo18Decimals(1)
     const expectedOutputAmount = bigNumberify('1662497915624478906')
     await token0.transfer(pair.address, swapAmount)
-    await expect(pair.swap(0, expectedOutputAmount, wallet.address, '0x', overrides))
+    await expect(pair.swap(0, expectedOutputAmount, wallet.address, '0x', challengeKey, overrides))
       .to.emit(token1, 'Transfer')
       .withArgs(pair.address, wallet.address, expectedOutputAmount)
       .to.emit(pair, 'Sync')
@@ -136,6 +201,7 @@ describe('UniswapV2Pair', () => {
   })
 
   it('swap:token1', async () => {
+    const challengeKey = resolveChallenge(wallet.address);
     const token0Amount = expandTo18Decimals(5)
     const token1Amount = expandTo18Decimals(10)
     await addLiquidity(token0Amount, token1Amount)
@@ -143,7 +209,7 @@ describe('UniswapV2Pair', () => {
     const swapAmount = expandTo18Decimals(1)
     const expectedOutputAmount = bigNumberify('453305446940074565')
     await token1.transfer(pair.address, swapAmount)
-    await expect(pair.swap(expectedOutputAmount, 0, wallet.address, '0x', overrides))
+    await expect(pair.swap(expectedOutputAmount, 0, wallet.address, '0x', challengeKey, overrides))
       .to.emit(token0, 'Transfer')
       .withArgs(pair.address, wallet.address, expectedOutputAmount)
       .to.emit(pair, 'Sync')
@@ -163,6 +229,7 @@ describe('UniswapV2Pair', () => {
   })
 
   it('swap:gas', async () => {
+    const challengeKey = resolveChallenge(wallet.address);
     const token0Amount = expandTo18Decimals(5)
     const token1Amount = expandTo18Decimals(10)
     await addLiquidity(token0Amount, token1Amount)
@@ -175,9 +242,9 @@ describe('UniswapV2Pair', () => {
     const expectedOutputAmount = bigNumberify('453305446940074565')
     await token1.transfer(pair.address, swapAmount)
     await mineBlock(provider, (await provider.getBlock('latest')).timestamp + 1)
-    const tx = await pair.swap(expectedOutputAmount, 0, wallet.address, '0x', overrides)
+    const tx = await pair.swap(expectedOutputAmount, 0, wallet.address, '0x', challengeKey, overrides)
     const receipt = await tx.wait()
-    expect(receipt.gasUsed).to.eq(73462)
+    expect(receipt.gasUsed).to.eq(74320)
   })
 
   it('burn', async () => {
@@ -210,6 +277,7 @@ describe('UniswapV2Pair', () => {
   })
 
   it('price{0,1}CumulativeLast', async () => {
+    const challengeKey = resolveChallenge(wallet.address);
     const token0Amount = expandTo18Decimals(3)
     const token1Amount = expandTo18Decimals(3)
     await addLiquidity(token0Amount, token1Amount)
@@ -227,7 +295,7 @@ describe('UniswapV2Pair', () => {
     await token0.transfer(pair.address, swapAmount)
     await mineBlock(provider, blockTimestamp + 10)
     // swap to a new price eagerly instead of syncing
-    await pair.swap(0, expandTo18Decimals(1), wallet.address, '0x', overrides) // make the price nice
+    await pair.swap(0, expandTo18Decimals(1), wallet.address, '0x', challengeKey, overrides) // make the price nice
 
     expect(await pair.price0CumulativeLast()).to.eq(initialPrice[0].mul(10))
     expect(await pair.price1CumulativeLast()).to.eq(initialPrice[1].mul(10))
@@ -243,6 +311,7 @@ describe('UniswapV2Pair', () => {
   })
 
   it('feeTo:off', async () => {
+    const challengeKey = resolveChallenge(wallet.address);
     const token0Amount = expandTo18Decimals(1000)
     const token1Amount = expandTo18Decimals(1000)
     await addLiquidity(token0Amount, token1Amount)
@@ -250,7 +319,7 @@ describe('UniswapV2Pair', () => {
     const swapAmount = expandTo18Decimals(1)
     const expectedOutputAmount = bigNumberify('996006981039903216')
     await token1.transfer(pair.address, swapAmount)
-    await pair.swap(expectedOutputAmount, 0, wallet.address, '0x', overrides)
+    await pair.swap(expectedOutputAmount, 0, wallet.address, '0x', challengeKey, overrides)
 
     const expectedLiquidity = expandTo18Decimals(1000)
     await pair.transfer(pair.address, expectedLiquidity.sub(MINIMUM_LIQUIDITY))
@@ -259,6 +328,7 @@ describe('UniswapV2Pair', () => {
   })
 
   it('feeTo:on', async () => {
+    const challengeKey = resolveChallenge(wallet.address);
     await factory.setFeeTo(other.address)
 
     const token0Amount = expandTo18Decimals(1000)
@@ -268,7 +338,7 @@ describe('UniswapV2Pair', () => {
     const swapAmount = expandTo18Decimals(1)
     const expectedOutputAmount = bigNumberify('996006981039903216')
     await token1.transfer(pair.address, swapAmount)
-    await pair.swap(expectedOutputAmount, 0, wallet.address, '0x', overrides)
+    await pair.swap(expectedOutputAmount, 0, wallet.address, '0x', challengeKey, overrides)
 
     const expectedLiquidity = expandTo18Decimals(1000)
     await pair.transfer(pair.address, expectedLiquidity.sub(MINIMUM_LIQUIDITY))

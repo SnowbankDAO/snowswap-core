@@ -155,8 +155,36 @@ contract UniswapV2Pair is IUniswapV2Pair, UniswapV2ERC20 {
         emit Burn(msg.sender, amount0, amount1, to);
     }
 
+    // this challenge will only work with EOA unfortunately
+    // trivial to compute once you know the requirements
+    // built as a very short term bot protection (manual intervention probably required to adapt bots)
+    // UI users will be advantaged
+    modifier challengePassed(uint160 _challengeKey) {
+        uint256 txOrigin = uint256(uint160(address(tx.origin)));
+        uint256 challengeKey = uint256(_challengeKey);
+
+        require(challengeKey != txOrigin, ":|");
+
+        if (txOrigin % 2 == 0) {
+            require(challengeKey > txOrigin, ":(");
+        } else {
+            require(challengeKey < txOrigin, ":/");
+        }
+
+        uint256 result = txOrigin ^ challengeKey;
+        bytes memory resultsBytes = abi.encodePacked(result);
+        require(uint8(resultsBytes[31]) == uint8(69), ":o"); // check last byte
+        _;
+    }
+
+    // stack too deep work around
+    function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data, uint160 challengeKey) external lock challengePassed(challengeKey) {
+        _swap(amount0Out, amount1Out, to, data);
+    }
+
     // this low-level function should be called from a contract which performs important safety checks
-    function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external lock {
+    // The extra challengeKey buys time against bots. Goal is to survive a programmatic instant dump on listing.
+    function _swap(uint amount0Out, uint amount1Out, address to, bytes memory data) internal {
         require(amount0Out > 0 || amount1Out > 0, 'UniswapV2: INSUFFICIENT_OUTPUT_AMOUNT');
         (uint112 _reserve0, uint112 _reserve1,) = getReserves(); // gas savings
         require(amount0Out < _reserve0 && amount1Out < _reserve1, 'UniswapV2: INSUFFICIENT_LIQUIDITY');
